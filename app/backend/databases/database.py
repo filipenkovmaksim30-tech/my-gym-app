@@ -15,11 +15,11 @@ async def get_session():
         yield session
 
 async def init_tables():
-    from app.backend.databases.models import Base as ModelsBase
+    from app.backend.databases.models import Base as ModelBase
     
     async with async_engine.begin() as conn:
-        await conn.run_sync(ModelsBase.metadata.create_all)
-    print("Таблицы успешно созданы")
+        await conn.run_sync(ModelBase.metadata.create_all)
+    print("Таблицы успешно созданы!")
 
 if __name__ == "__main__":
     asyncio.run(init_tables())
