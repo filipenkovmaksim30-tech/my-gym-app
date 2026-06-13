@@ -23,10 +23,21 @@ async def global_exception_handler(request: Request, exc: Exception):
     print(f"Сообщение: {str(exc)}")
     print("\n Полный Traceback:")
     traceback.print_exc()
+
+    status_code = 500
+    detail_message = "Internal Server Error"
+
+    if isinstance(exc, ValueError):
+        status_code = 404  # Не найден
+        detail_message = str(exc)
+    elif isinstance(exc, PermissionError):
+        status_code = 400
+        detail_message = str(exc)
+
     return JSONResponse(
-        status_code=500,
+        status_code=status_code,
         content={
-            "detail": "Internal Server Error",
+            "detail": detail_message,
             "exception_type": type(exc).__name__,
             "exception_msg": str(exc),
             "traceback": traceback.format_exc()

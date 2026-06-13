@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.backend.databases.database import get_session
-from app.backend.crud.users import create_user, get_user_by_username
-from app.backend.schemas.user_schemas import UserCreate, UserResponse
+from app.backend.crud.users import create_user, get_user_by_username, change_user_password
+from app.backend.schemas.user_schemas import UserCreate, UserResponse, ChangePassword
 from app.backend.databases.models import User
-from app.backend.auth.auth import create_access_token
+from app.backend.auth.auth import create_access_token, get_current_user
 from app.backend.auth.security import verify_password
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,4 +63,22 @@ async def login(
         "success": True,
         "message" : "Вы успешно вошли в систему"
     }
+
+
+@router.post("/change-password",
+     status_code=status.HTTP_200_OK,
+     summary="Смена пароля пользователя"   
+)
+async def change_password(
+    password_data: ChangePassword,
+    session: AsyncSession = Depends(get_session),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    result = await change_user_password(
+        session,
+        user_id=current_user.id,
+        password_data=password_data
+    )
+    return result
+
 

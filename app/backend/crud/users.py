@@ -36,18 +36,17 @@ async def authenticate_user(session: AsyncSession, user: UserLogin):
 
 
 
-async def change_user_password(session: AsyncSession, user_id: int, password: ChangePassword):
+async def change_user_password(session: AsyncSession, user_id: int, password_data: ChangePassword):
     query = select(User).where(User.id == user_id)
     result = await session.execute(query)
     db_user = result.scalar_one_or_none()
     if not db_user:
         raise ValueError("Пользователь не найден")
     
-    if not verify_password(password.old_password, db_user.password_hash):
-        raise ValueError("Неверный текущий пароль")
-    db_user.password_hash = password.new_password
+    if not verify_password(password_data.old_password, db_user.password):
+        raise PermissionError("Неверный текущий пароль")
 
-    db_user.password = get_password_hash(password.new_password)
+    db_user.password = get_password_hash(password_data.new_password)
 
     await session.commit()
     return {
