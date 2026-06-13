@@ -1,0 +1,69 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+import uvicorn
+import traceback
+from contextlib import asynccontextmanager
+
+from app.backend.routers import auth
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+
+app = FastAPI(
+    title="1.5 качка",
+    lifespan=lifespan
+)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"Тип: {type(exc).__name__}")
+    print(f"Сообщение: {str(exc)}")
+    print("\n Полный Traceback:")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error",
+            "exception_type": type(exc).__name__,
+            "exception_msg": str(exc),
+            "traceback": traceback.format_exc()
+        }
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for err in exc.errors():
+        msg = err.get('msg')
+        if isinstance(msg, Exception):
+            msg = str(msg)
+        clean_err = {
+            "loc": err.get('loc'),
+            "msg": msg,
+            "type": err.get('type')
+        }
+        errors.append(clean_err)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors}
+    )
+
+
+@app.get("/root")
+async def print_hello():
+    return "hello"
+
+app.include_router(auth.router)
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "backend.main:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )
