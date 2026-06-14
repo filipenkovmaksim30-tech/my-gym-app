@@ -5,7 +5,7 @@ import uvicorn
 import traceback
 from contextlib import asynccontextmanager
 
-from app.backend.routers import auth
+from app.backend.routers import auth, workout_plan
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +28,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     detail_message = "Internal Server Error"
 
     if isinstance(exc, ValueError):
-        status_code = 404  # Не найден
+        status_code = 404
         detail_message = str(exc)
     elif isinstance(exc, PermissionError):
         status_code = 400
@@ -68,6 +68,7 @@ async def print_hello():
     return "hello"
 
 app.include_router(auth.router)
+app.include_router(workout_plan.router)
 
 
 if __name__ == "__main__":

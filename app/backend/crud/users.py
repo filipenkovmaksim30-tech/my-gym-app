@@ -21,7 +21,7 @@ async def create_user(session: AsyncSession, user: UserCreate):
 
 
 async def authenticate_user(session: AsyncSession, user: UserLogin):
-    query = (select(User).where(User.username == user.username))
+    query = select(User).where(User.username == user.username)
     result = await session.execute(query)
 
     db_user = result.scalar_one_or_none()
