@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Lock, Dumbbell, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import axios from 'axios';
 
 export default function Login({ onNavigate }) {
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -15,10 +16,33 @@ export default function Login({ onNavigate }) {
     setError('');
 
     try {
-      alert('Вход успешен!');
-      onNavigate('calendar'); 
+      // Переводим данные в формат Form Data для FastAPI OAuth2
+      const params = new URLSearchParams();
+      params.append('username', formData.username);
+      params.append('password', formData.password);
+
+      // Отправляем запрос на бэк с флагом сCredentials, чтобы браузер сохранил куку
+      const response = await axios.post('http://127.0.0.1:8000/auth/login', params, {
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded' 
+        },
+        withCredentials: true 
+      });
+
+      // Если бэк вернул флаг успеха — кука на месте, можно идти в календарь
+      if (response.data.success === true) {
+        onNavigate('calendar'); 
+      } else {
+        setError('Не удалось войти. Проверь структуру ответа бэкенда.');
+      }
+
     } catch (err) {
-      setError(err.message);
+      console.error(err);
+      if (err.response && err.response.data && err.response.data.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError('Неверное имя пользователя или пароль');
+      }
     }
   };
 
@@ -66,7 +90,7 @@ export default function Login({ onNavigate }) {
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
               <input
-                type={showPassword ? 'text' : 'password'} // Меняем тип динамически
+                type={showPassword ? 'text' : 'password'}
                 name="password"
                 required
                 value={formData.password}

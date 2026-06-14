@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter(tags=["Workoutplan"], prefix="/workoutplan")
 
 
-@router.post("/",
+@router.post("",
     response_model=WorkoutPlanResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Создание плана дня тренировки"    
@@ -41,7 +41,7 @@ async def read_workoutplan(
         raise HTTPException(status_code=404, detail="План тренировки не найден")
     return result
 
-@router.get("/",
+@router.get("",
     response_model=List[WorkoutPlanResponse],
     status_code=status.HTTP_200_OK,
     summary="Получить все планы тренировок текущего пользователя"    
