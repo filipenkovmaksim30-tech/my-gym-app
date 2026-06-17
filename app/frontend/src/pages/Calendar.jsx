@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dumbbell, Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
-import { workoutPlanApi } from '../api/client';
+import { workoutPlanApi, exerciseApi, plannedSetsApi, actualSetsApi } from '../api/client';
+
+// Функция дебаунса для предотвращения спама PUT-запросов
+const debounce = (func, delay) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => func(...args), delay);
+  };
+};
 
 export default function Calendar({ onNavigate }) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -8,11 +17,15 @@ export default function Calendar({ onNavigate }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Управление боковой панелью (Drawer) вместо старых модалок
+  // Управление боковой панелью (Drawer)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [workoutTitle, setWorkoutTitle] = useState('');
   const [editingWorkout, setEditingWorkout] = useState(null);
+
+  // Стейты для конструктора упражнений
+  const [exercises, setExercises] = useState([]);
+  const [newExerciseName, setNewExerciseName] = useState('');
 
   const fetchWorkouts = async () => {
     try {
@@ -32,10 +45,203 @@ export default function Calendar({ onNavigate }) {
     }
   };
 
+  const fetchExercises = async (workoutId) => {
+    try {
+      const data = await exerciseApi.getByWorkout(workoutId);
+      setExercises(data);
+    } catch (err) {
+      console.error('Ошибка загрузки упражнений:', err);
+    }
+  };
+
   useEffect(() => {
     fetchWorkouts();
   }, []);
 
+  useEffect(() => {
+    if (editingWorkout) {
+      fetchExercises(editingWorkout.id);
+    } else {
+      setExercises([]);
+    }
+    setNewExerciseName('');
+  }, [editingWorkout]);
+
+  // --- ДЕБАУНС ФУНКЦИИ ДЛЯ ОБНОВЛЕНИЯ ПОДХОДОВ НА БЭКЕНДЕ ---
+  const debouncedUpdatePlannedApproach = useCallback(
+    debounce(async (approachId, updatedFields) => {
+      try {
+        await plannedSetsApi.update(approachId, updatedFields);
+      } catch (err) {
+        console.error('Ошибка при дебаунс-обновлении планового подхода:', err);
+      }
+    }, 1000),
+    []
+  );
+
+  const debouncedUpdateActualApproach = useCallback(
+    debounce(async (approachId, updatedFields) => {
+      try {
+        await actualSetsApi.update(approachId, updatedFields);
+      } catch (err) {
+        console.error('Ошибка при дебаунс-обновлении фактического подхода:', err);
+      }
+    }, 1000),
+    []
+  );
+
+  // --- ОБЩИЙ ОБРАБОТЧИК ОНЛАЙН-ВВОДА В ИНПУТЫ ---
+  const handleInputChange = (exerciseId, setId, type, field, value) => {
+    const numValue = value === '' ? '' : parseFloat(value);
+
+    setExercises(prevExercises => prevExercises.map(ex => {
+      if (ex.id !== exerciseId) return ex;
+
+      if (type === 'planned') {
+        const updatedSets = (ex.planned_sets || []).map(set => {
+          if (set.id !== setId) return set;
+          const updatedSet = { ...set, [field]: numValue };
+          
+          // Рассчитываем финальные валидные данные для бэка
+          const target_weight = field === 'target_weight' ? (parseFloat(value) || 0) : (set.target_weight || 0);
+          let target_reps = field === 'target_reps' ? (parseInt(value) || 1) : (set.target_reps || 1);
+          if (target_reps < 1) target_reps = 1; // Защита от reps < 1
+
+          debouncedUpdatePlannedApproach(setId, { target_weight, target_reps });
+          return updatedSet;
+        });
+        return { ...ex, planned_sets: updatedSets };
+      } else {
+        const updatedSets = (ex.actual_sets || []).map(set => {
+          if (set.id !== setId) return set;
+          const updatedSet = { ...set, [field]: numValue };
+
+          const weight = field === 'weight' ? (parseFloat(value) || 0) : (set.weight || 0);
+          let reps_done = field === 'reps_done' ? (parseInt(value) || 1) : (set.reps_done || 1);
+          if (reps_done < 1) reps_done = 1; // Защита от reps < 1
+
+          debouncedUpdateActualApproach(setId, { weight, reps_done });
+          return updatedSet;
+        });
+        return { ...ex, actual_sets: updatedSets };
+      }
+    }));
+  };
+
+  // --- ЛОГИКА УПРАЖНЕНИЙ ---
+  const handleAddExercise = async (e) => {
+    e.preventDefault();
+    if (!newExerciseName.trim() || !editingWorkout) return;
+    try {
+      const newEx = await exerciseApi.create(editingWorkout.id, newExerciseName.trim());
+      setExercises([...exercises, { ...newEx, planned_sets: [], actual_sets: [] }]);
+      setNewExerciseName('');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateExerciseName = async (exerciseId, newName) => {
+    if (!newName.trim()) return;
+    try {
+      await exerciseApi.update(exerciseId, { exercise_name: newName.trim() });
+      setExercises(exercises.map(ex => 
+        ex.id === exerciseId ? { ...ex, exercise_name: newName.trim() } : ex
+      ));
+    } catch (err) {
+      console.error('Ошибка при обновлении названия упражнения:', err);
+    }
+  };
+
+  const handleDeleteExercise = async (exerciseId) => {
+    try {
+      await exerciseApi.delete(exerciseId);
+      setExercises(exercises.filter(ex => ex.id !== exerciseId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- УМНОЕ ДОБАВЛЕНИЕ ПЛАНОВОГО ПОДХОДА (КОПИРОВАНИЕ ПРЕДЫДУЩЕГО) ---
+  const handleAddPlannedApproach = async (exerciseId) => {
+    const currentEx = exercises.find(ex => ex.id === exerciseId);
+    if (!currentEx) return;
+    
+    const plannedSets = currentEx.planned_sets || [];
+    const nextSetNumber = plannedSets.length + 1;
+
+    // Копируем параметры последнего существующего подхода или берем дефолты
+    const lastSet = plannedSets[plannedSets.length - 1];
+    const defaultWeight = lastSet ? lastSet.target_weight : 0;
+    let defaultReps = lastSet ? lastSet.target_reps : 1;
+    if (defaultReps < 1) defaultReps = 1;
+
+    try {
+      const newApproach = await plannedSetsApi.create(exerciseId, nextSetNumber, defaultWeight, defaultReps);
+      
+      setExercises(exercises.map(ex => 
+        ex.id === exerciseId ? { ...ex, planned_sets: [...plannedSets, newApproach] } : ex
+      ));
+    } catch (err) {
+      console.error('Ошибка добавления запланированного подхода:', err);
+    }
+  };
+
+  const handleDeletePlannedApproach = async (exerciseId, approachId) => {
+    try {
+      await plannedSetsApi.delete(approachId);
+      setExercises(exercises.map(ex => 
+        ex.id === exerciseId 
+          ? { ...ex, planned_sets: (ex.planned_sets || []).filter(a => a.id !== approachId) }
+          : ex
+      ));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- УМНОЕ ДОБАВЛЕНИЕ ФАКТИЧЕСКОГО ПОДХОДА (ИЗ ПЛАНА ИЛИ ПРЕДЫДУЩЕГО ФАКТА) ---
+  const handleAddActualApproach = async (exerciseId) => {
+    const currentEx = exercises.find(ex => ex.id === exerciseId);
+    if (!currentEx) return;
+
+    const actualSets = currentEx.actual_sets || [];
+    const plannedSets = currentEx.planned_sets || [];
+    const nextSetNumber = actualSets.length + 1;
+    
+    // Ищем шаблон в плановом подходе на этот же номер, либо берем прошлый факт
+    const lastActual = actualSets[actualSets.length - 1];
+    const template = plannedSets[nextSetNumber - 1] || lastActual || {};
+    
+    const weight = template.target_weight !== undefined ? template.target_weight : (template.weight || 0);
+    let reps = template.target_reps !== undefined ? template.target_reps : (template.reps_done || 1);
+    if (reps < 1) reps = 1;
+    
+    try {
+      const newApproach = await actualSetsApi.create(exerciseId, nextSetNumber, weight, reps);
+
+      setExercises(exercises.map(ex => 
+        ex.id === exerciseId ? { ...ex, actual_sets: [...actualSets, newApproach] } : ex
+      ));
+    } catch (err) {
+      console.error('Ошибка добавления фактического подхода:', err);
+    }
+  };
+
+  const handleDeleteActualApproach = async (exerciseId, approachId) => {
+    try {
+      await actualSetsApi.delete(approachId);
+      setExercises(exercises.map(ex => 
+        ex.id === exerciseId 
+          ? { ...ex, actual_sets: (ex.actual_sets || []).filter(a => a.id !== approachId) }
+          : ex
+      ));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- КАЛЕНДАРНАЯ МАТЕМАТИКА ---
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => {
     const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
@@ -78,15 +284,16 @@ export default function Calendar({ onNavigate }) {
 
     try {
       if (editingWorkout) {
-        await workoutPlanApi.update(editingWorkout.id, { title: workoutTitle, date: selectedDate });
+        await workoutPlanApi.update(editingWorkout.id, { title: workoutTitle.trim() });
+        setIsSidebarOpen(false);
       } else {
-        await workoutPlanApi.create(selectedDate, workoutTitle);
+        const created = await workoutPlanApi.create(selectedDate, workoutTitle.trim());
+        setEditingWorkout(created);
       }
-      setIsSidebarOpen(false);
       fetchWorkouts();
     } catch (err) {
       console.error(err);
-      setError('Не удалось сохранить план');
+      setError('Не удалось сохранить план тренировки');
     }
   };
 
@@ -130,13 +337,10 @@ export default function Calendar({ onNavigate }) {
               {day}
             </span>
             {dayWorkouts.length > 0 && (
-              <span className="text-[10px] text-zinc-500 font-medium">
-                Тр: {dayWorkouts.length}
-              </span>
+              <span className="text-[10px] text-zinc-500 font-medium">Тр: {dayWorkouts.length}</span>
             )}
           </div>
 
-          {/* Список планов на этот день */}
           <div className="space-y-1 flex-1 overflow-y-auto max-h-[65px] md:max-h-[90px] custom-scrollbar pt-1">
             {dayWorkouts.map((workout) => (
               <div
@@ -166,7 +370,7 @@ export default function Calendar({ onNavigate }) {
     <div className="min-h-screen bg-zinc-950 text-zinc-50 p-4 md:p-8 relative overflow-x-hidden">
       <div className={`max-w-6xl mx-auto transition-all duration-300 ${isSidebarOpen ? 'pr-0 md:pr-[20px] opacity-60 pointer-events-none md:pointer-events-auto md:opacity-100' : ''}`}>
         
-        {/* Шапка */}
+        {/* Шапка календаря */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 md:p-6 shadow-xl">
           <div className="flex items-center gap-3">
             <div className="bg-amber-500 text-zinc-950 p-2.5 rounded-xl shadow-lg shadow-amber-500/10">
@@ -193,7 +397,7 @@ export default function Calendar({ onNavigate }) {
           </div>
         )}
 
-        {/* Сетка */}
+        {/* Сетка дней */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-xl">
           <div className="grid grid-cols-7 gap-1 text-center mb-2">
             {weekDays.map(day => (
@@ -211,14 +415,14 @@ export default function Calendar({ onNavigate }) {
         </div>
       </div>
 
-      {/* ВЫДВИЖНАЯ БОКОВАЯ ПАНЕЛЬ (DRAWER) */}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-zinc-900 border-l border-zinc-800 p-6 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+      {/* ВЫДВИЖНАЯ ПАНЕЛЬ */}
+      <div className={`fixed top-0 right-0 h-full w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl bg-zinc-900 border-l border-zinc-800 p-4 md:p-6 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 overflow-y-auto ${
         isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
       }`}>
         <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-          <h2 className="text-lg font-bold flex items-center gap-2 text-zinc-100">
+          <h2 className="text-base md:text-lg font-bold flex items-center gap-2 text-zinc-100">
             <CalendarIcon size={20} className="text-amber-500" />
-            {editingWorkout ? 'Редактировать план' : 'Новая тренировка'}
+            {editingWorkout ? 'Редактировать plan' : 'Новая тренировка'}
           </h2>
           <button 
             onClick={() => setIsSidebarOpen(false)}
@@ -228,52 +432,47 @@ export default function Calendar({ onNavigate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-5 flex flex-col h-[calc(100%-80px)] justify-between">
-          <div className="space-y-4">
+        {/* Форма заголовка тренировки */}
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-zinc-400 font-bold mb-2 uppercase tracking-wider">Дата проведения</label>
+              <label className="block text-[10px] text-zinc-400 font-bold mb-1.5 uppercase tracking-wider">Дата проведения</label>
               <input 
                 type="date" 
                 value={selectedDate} 
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-100 text-xs focus:outline-none focus:border-amber-500 transition-colors"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-400 font-bold mb-2 uppercase tracking-wider">Название или Фокус дня</label>
+              <label className="block text-[10px] text-zinc-400 font-bold mb-1.5 uppercase tracking-wider">Фокус дня</label>
               <input 
                 type="text" 
                 value={workoutTitle} 
                 onChange={(e) => setWorkoutTitle(e.target.value)}
-                placeholder="Например: Грудь + Спина (Силовая)" 
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition-colors placeholder-zinc-600"
+                placeholder="Например: Силовая Грудь" 
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-100 text-xs focus:outline-none focus:border-amber-500 transition-colors placeholder-zinc-600"
+                maxLength={30}
                 required
-                autoFocus
               />
-            </div>
-
-            {/* ТУТ В БУДУЩЕМ БУДЕТ НАШ КОНСТРУКТОР УПРАЖНЕНИЙ */}
-            <div className="p-4 bg-zinc-950/40 border border-zinc-800/60 rounded-xl border-dashed flex flex-col items-center justify-center text-center py-8 text-zinc-500">
-              <Plus size={24} className="mb-2 text-zinc-600" />
-              <p className="text-xs">Конструктор подходов будет доступен после обновления БД бэкенда</p>
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4 border-t border-zinc-800">
+          <div className="flex gap-2 pt-2">
             <button 
               type="submit" 
-              className="flex-1 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold py-3 px-4 rounded-xl text-sm transition-colors shadow-lg shadow-amber-500/10"
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-lg shadow-amber-500/10"
             >
-              {editingWorkout ? 'Сохранить' : 'Создать план'}
+              {editingWorkout ? 'Обновить название' : 'Создать тренировку'}
             </button>
             
             {editingWorkout && (
               <button 
                 type="button" 
                 onClick={handleDelete}
-                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-3 rounded-xl transition-colors"
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2.5 rounded-xl transition-colors"
                 title="Удалить"
               >
                 <Trash2 size={18} />
@@ -281,6 +480,153 @@ export default function Calendar({ onNavigate }) {
             )}
           </div>
         </form>
+
+        {/* КОНСТРУКТОР ДЛЯ НАПОЛНЕНИЯ ТРЕНИРОВКИ */}
+        {editingWorkout && (
+          <div className="mt-8 pt-6 border-t border-zinc-800 space-y-6">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Список упражнений в этой тренировке</h3>
+            
+            {/* Форма добавления нового упражнения */}
+            <form onSubmit={handleAddExercise} className="flex gap-2">
+              <input 
+                type="text"
+                placeholder="Название упражнения (например: Жим лежа)..."
+                value={newExerciseName}
+                onChange={(e) => setNewExerciseName(e.target.value)}
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-100 text-xs focus:outline-none focus:border-amber-500 transition-colors placeholder-zinc-600"
+                required
+              />
+              <button 
+                type="submit" 
+                className="bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 px-4 py-2 rounded-xl text-xs font-bold transition-all"
+              >
+                + Добавить
+              </button>
+            </form>
+
+            {/* Список добавленных упражнений */}
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
+              {exercises.length === 0 ? (
+                <p className="text-xs text-zinc-500 italic text-center py-6">В плане пока пусто. Добавьте упражнение выше.</p>
+              ) : (
+                exercises.map((exercise) => (
+                  <div key={exercise.id} className="bg-zinc-950 p-4 rounded-xl border border-zinc-850/60 space-y-3">
+                    
+                    {/* ШАПКА УПРАЖНЕНИЯ: С ИНЛАЙН-РЕДАКТИРОВАНИЕМ НАЗВАНИЯ */}
+                    <div className="flex justify-between items-center border-b border-zinc-900/80 pb-2 gap-2">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="text-xs">🏋️‍♂️</span>
+                        <input 
+                          type="text"
+                          defaultValue={exercise.exercise_name}
+                          onBlur={(e) => handleUpdateExerciseName(exercise.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.target.blur();
+                            }
+                          }}
+                          className="bg-transparent border-b border-transparent hover:border-zinc-800 focus:border-amber-500 focus:bg-zinc-900/60 text-xs font-bold text-amber-400 px-1 py-0.5 rounded transition-all outline-none flex-1 min-w-0 truncate"
+                          title="Кликните, чтобы изменить название упражнения"
+                        />
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteExercise(exercise.id)}
+                        className="text-zinc-600 hover:text-red-400 transition-colors p-1 shrink-0"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {/* СЕТКА ПОДХОДОВ */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      
+                      {/* КОЛОНКА: ПЛАН */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] text-orange-400/80 font-bold uppercase tracking-wider block border-b border-zinc-900 pb-1">📋 План</span>
+                        <div className="space-y-2">
+                          {(exercise.planned_sets || []).map((approach) => (
+                            <div key={`p-${approach.id}`} className="flex items-center gap-1.5 text-xs">
+                              <span className="text-zinc-600 font-medium w-4">{approach.set_number}.</span>
+                              <input 
+                                type="number" 
+                                value={approach.target_weight ?? ''}
+                                onChange={(e) => handleInputChange(exercise.id, approach.id, 'planned', 'target_weight', e.target.value)}
+                                className="w-12 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-center text-zinc-200 focus:border-amber-500/70 outline-none"
+                              />
+                              <span className="text-zinc-600">кг</span>
+                              <input 
+                                type="number" 
+                                value={approach.target_reps ?? ''}
+                                onChange={(e) => handleInputChange(exercise.id, approach.id, 'planned', 'target_reps', e.target.value)}
+                                className="w-10 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-center text-zinc-200 focus:border-amber-500/70 outline-none"
+                              />
+                              <span className="text-zinc-600">повт</span>
+                              <button 
+                                type="button" 
+                                onClick={() => handleDeletePlannedApproach(exercise.id, approach.id)}
+                                className="text-zinc-700 hover:text-red-400 ml-auto p-0.5"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => handleAddPlannedApproach(exercise.id)}
+                          className="w-full mt-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-zinc-200 rounded-lg border border-zinc-800 transition-all uppercase tracking-wider"
+                        >
+                          + Добавить подход
+                        </button>
+                      </div>
+
+                      {/* КОЛОНКА: ВЫПОЛНЕНИЕ (ФАКТ) */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] text-emerald-400/80 font-bold uppercase tracking-wider block border-b border-zinc-900 pb-1">✅ Выполнение</span>
+                        <div className="space-y-2">
+                          {(exercise.actual_sets || []).map((approach) => (
+                            <div key={`a-${approach.id}`} className="flex items-center gap-1.5 text-xs">
+                              <span className="text-zinc-600 font-medium w-4">{approach.set_number}.</span>
+                              <input 
+                                type="number" 
+                                value={approach.weight ?? ''}
+                                onChange={(e) => handleInputChange(exercise.id, approach.id, 'actual', 'weight', e.target.value)}
+                                className="w-12 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-center text-zinc-200 focus:border-emerald-500/70 outline-none"
+                              />
+                              <span className="text-zinc-600">кг</span>
+                              <input 
+                                type="number" 
+                                value={approach.reps_done ?? ''}
+                                onChange={(e) => handleInputChange(exercise.id, approach.id, 'actual', 'reps_done', e.target.value)}
+                                className="w-10 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-center text-zinc-200 focus:border-emerald-500/70 outline-none"
+                              />
+                              <span className="text-zinc-600">повт</span>
+                              <button 
+                                type="button" 
+                                onClick={() => handleDeleteActualApproach(exercise.id, approach.id)}
+                                className="text-zinc-700 hover:text-red-400 ml-auto p-0.5"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => handleAddActualApproach(exercise.id)}
+                          className="w-full mt-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-emerald-400 rounded-lg border border-zinc-800 transition-all uppercase tracking-wider"
+                        >
+                          💪 Засчитать подход
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
