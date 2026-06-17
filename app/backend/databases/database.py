@@ -18,6 +18,7 @@ async def init_tables():
     from app.backend.databases.models import Base as ModelBase
     
     async with async_engine.begin() as conn:
+        await conn.run_sync(ModelBase.metadata.drop_all)
         await conn.run_sync(ModelBase.metadata.create_all)
     print("Таблицы успешно созданы!")
 

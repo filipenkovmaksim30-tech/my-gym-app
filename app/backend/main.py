@@ -6,7 +6,7 @@ import uvicorn
 import traceback
 from contextlib import asynccontextmanager
 
-from app.backend.routers import auth, workout_plan
+from app.backend.routers import auth, workout_plan, planned_exericse, planned_sets
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,6 +78,8 @@ async def print_hello():
 
 app.include_router(auth.router)
 app.include_router(workout_plan.router)
+app.include_router(planned_exericse.router)
+app.include_router(planned_sets.router)
 
 
 if __name__ == "__main__":

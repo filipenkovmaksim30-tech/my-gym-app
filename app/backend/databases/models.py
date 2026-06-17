@@ -24,24 +24,38 @@ class WorkoutPlan(Base):
     exercises = relationship("PlannedExercise", back_populates="workout_plan", cascade="all, delete-orphan")
 
 
-#запланированные подходы на упражнение
+#запланированные упражнения
 class PlannedExercise(Base):
     __tablename__ = "planned_exercises"
+    
     id = Column(Integer, primary_key=True)
-    workout_plan_id = Column(Integer, ForeignKey("workout_plans.id"))
+    workout_plan_id = Column(Integer, ForeignKey("workout_plans.id", ondelete="CASCADE"))
     exercise_name = Column(String, nullable=False)
-    target_sets = Column(Integer, nullable=False)
-    target_reps = Column(Integer, nullable=False)
 
     workout_plan = relationship("WorkoutPlan", back_populates="exercises")
+    planned_sets = relationship("PlannedSet", back_populates="planned_exercise", cascade="all, delete-orphan")
     actual_sets = relationship("ActualSet", back_populates="planned_exercise", cascade="all, delete-orphan")
-    
+
+#запланированные подходы
+class PlannedSet(Base):
+    __tablename__ = "planned_sets"
+
+    id = Column(Integer, primary_key=True)
+    planned_exercise_id = Column(Integer, ForeignKey("planned_exercises.id", ondelete="CASCADE"), nullable=False)
+    set_number = Column(Integer, nullable=False)
+    target_weight = Column(Float, nullable=True)
+    target_reps = Column(Integer, nullable=False)
+
+    planned_exercise = relationship("PlannedExercise", back_populates="planned_sets")
+
+#реальные подходы
 class ActualSet(Base):
     __tablename__ = "actual_sets" 
+    
     id = Column(Integer, primary_key=True)
-    planned_exercise_id = Column(Integer, ForeignKey("planned_exercises.id"), nullable=False)
+    planned_exercise_id = Column(Integer, ForeignKey("planned_exercises.id", ondelete="CASCADE"), nullable=False)
     set_number = Column(Integer, nullable=False)
     weight = Column(Float, nullable=False)
-    reps_done = Column(String, nullable=False)
+    reps_done = Column(Integer, nullable=False)
 
     planned_exercise = relationship("PlannedExercise", back_populates="actual_sets")

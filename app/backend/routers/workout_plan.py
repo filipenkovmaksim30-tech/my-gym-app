@@ -79,5 +79,5 @@ async def delete_workoutplan(
 ):
     deleted = await delete_workplan_by_id(session, workoutplan_id, current_user.id)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Предмет с ID {workoutplan_id} не найден")
+        raise HTTPException(status_code=404, detail=f"План с ID {workoutplan_id} не найден")
     return {"success": True, "message": "План тренировки удален"}
