@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from typing import List
 
 from app.backend.crud.workout_plans import init_workplan, get_workplan_by_id, update_workplan_by_id , \
-delete_workplan_by_id, get_all_workplans_by_user
+delete_workplan_by_id, get_all_workplans_by_user, copy_workout_plan_to_date
 from app.backend.databases.database import get_session
-from app.backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan
+from app.backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan, CopyWorkoutPlanRequest
 from app.backend.schemas.user_schemas import UserResponse
 from app.backend.auth.auth import get_current_user
 
@@ -52,6 +52,24 @@ async def read_all_read_workoutplans(
 ):
     workoutplans = await get_all_workplans_by_user(session, current_user.id)
     return workoutplans
+
+@router.post("/{workout_plan_id}/copy",
+    response_model=WorkoutPlanResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Скопировать тренировку (без подходов)"
+)
+async def copy_workout_plan(
+    workout_plan_id: int,
+    payload: CopyWorkoutPlanRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    copyied_plan = await copy_workout_plan_to_date(session, workout_plan_id, payload.new_data, current_user.id)
+
+    if not copyied_plan:
+        raise HTTPException(status_code=404, detail="Тренировка для копирования не найдена или доступ запрещен")
+    
+    return copyied_plan
 
 @router.patch("/{workoutplan_id}",
     status_code=status.HTTP_200_OK,

@@ -1,7 +1,10 @@
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.backend.databases.models import WorkoutPlan
+from datetime import date
+
+from app.backend.databases.models import WorkoutPlan, PlannedExercise
 from app.backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan
 
 
@@ -58,3 +61,37 @@ async def delete_workplan_by_id(session: AsyncSession, workplan_id: int, user_id
         "success": True,
         "message": "Тренировка успешно удалена"
     }
+
+
+async def copy_workout_plan_to_date(session: AsyncSession, workout_plan_id: int, new_date: date, user_id: int):
+    query = (
+        select(WorkoutPlan)
+        .options(selectinload(WorkoutPlan.exercises))
+        .where(WorkoutPlan.id == workout_plan_id, WorkoutPlan.user_id == user_id)
+    )
+
+    result = await session.execute(query)
+    old_plan = result.scalar_one_or_none()
+
+    if not old_plan:
+        return None
+    
+    new_plan = WorkoutPlan(
+        user_id=user_id,
+        date=new_date,
+        title=old_plan.title
+    )
+
+    session.add(new_plan)
+    await session.flush()
+
+    for old_ex in old_plan.exercises:
+        new_ex = PlannedExercise(
+            workout_plan_id=new_plan.id,
+            exercise_name=old_ex.exercise_name
+        )
+        session.add(new_ex)
+
+    await session.commit()
+    await session.refresh(new_plan)
+    return new_plan

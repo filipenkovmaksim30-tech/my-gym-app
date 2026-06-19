@@ -20,3 +20,6 @@ class WorkoutPlanResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CopyWorkoutPlanRequest(BaseModel):
+    new_data: date
