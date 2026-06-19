@@ -14,3 +14,22 @@ from .workout_plans import (
     delete_workplan_by_id
 )
 
+from .planned_exercises import (
+    init_planned_exercises,
+    get_all_planned_exercises_by_workout_plan_id,
+    get_planned_exercises_by_id,
+    edit_planned_exercises,
+    delete_planned_exercises
+)
+
+from .planned_sets import (
+    init_planned_set,
+    edit_planned_set,
+    delete_planned_set,
+)
+
+from .actual_sets import (
+    init_actual_set,
+    edit_actual_set,
+    delete_actual_set_by_id
+)
