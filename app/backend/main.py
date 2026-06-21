@@ -6,11 +6,16 @@ import uvicorn
 import traceback
 from contextlib import asynccontextmanager
 
-from app.backend.routers import auth, workout_plan, planned_exericse, planned_sets, actual_set
+from backend.routers import auth, workout_plan, planned_sets, actual_set, planned_exercise
+from backend.databases.database import init_db
+from backend.cache.redis import cache_backend
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await init_db()
+    await cache_backend.connect()
     yield
+    await cache_backend.close()
 
 app = FastAPI(
     title="1.5 качка",
@@ -78,7 +83,7 @@ async def print_hello():
 
 app.include_router(auth.router)
 app.include_router(workout_plan.router)
-app.include_router(planned_exericse.router)
+app.include_router(planned_exercise.router)
 app.include_router(planned_sets.router)
 app.include_router(actual_set.router)
 

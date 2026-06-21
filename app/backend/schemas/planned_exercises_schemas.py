@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from app.backend.schemas.planned_set_schemas import PlannedSetResponse
-from app.backend.schemas.actual_set_schemas import ActualSetResponse
+from backend.schemas.planned_set_schemas import PlannedSetResponse
+from backend.schemas.actual_set_schemas import ActualSetResponse
 
 class CreatePlannedExercises(BaseModel):
     workout_plan_id: int

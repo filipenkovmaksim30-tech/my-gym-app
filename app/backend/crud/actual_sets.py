@@ -1,8 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-from app.backend.databases.models import ActualSet, WorkoutPlan, PlannedExercise
-from app.backend.schemas.actual_set_schemas import ActualSetBase, ActualSetResponse, CreateActualSet, EditActualSet
+from backend.databases.models import ActualSet, WorkoutPlan, PlannedExercise
+from backend.schemas.actual_set_schemas import CreateActualSet, EditActualSet
 
 async def init_actual_set(session: AsyncSession, actual_data: CreateActualSet, user_id: int):
     query = (
@@ -19,14 +20,21 @@ async def init_actual_set(session: AsyncSession, actual_data: CreateActualSet, u
     new_actual_set = ActualSet(**actual_data.model_dump())
     session.add(new_actual_set)
     await session.commit()
-    await session.refresh(new_actual_set)
-    return new_actual_set
+    
+    stmt = (
+        select(ActualSet)
+        .options(selectinload(ActualSet.planned_exercise))
+        .where(ActualSet.id == new_actual_set.id)
+    )
+    res = await session.execute(stmt)
+    return res.scalar_one()
 
 async def edit_actual_set(session: AsyncSession, actual_set_id: int, updated_data: EditActualSet, user_id: int):
     query = (
         select(ActualSet)
         .join(PlannedExercise)
         .join(WorkoutPlan)
+        .options(selectinload(ActualSet.planned_exercise))
         .where(ActualSet.id == actual_set_id, WorkoutPlan.user_id == user_id)
     )
 
@@ -34,21 +42,29 @@ async def edit_actual_set(session: AsyncSession, actual_set_id: int, updated_dat
     db_actual_set = result.scalar_one_or_none()
 
     if not db_actual_set:
-        return False
+        return None
     
     updated_dict = updated_data.model_dump(exclude_unset=True, exclude_none=True)
     for key, value in updated_dict.items():
         setattr(db_actual_set, key, value)
 
     await session.commit()
-    await session.refresh(db_actual_set)
-    return db_actual_set
+    
+
+    stmt = (
+        select(ActualSet)
+        .options(selectinload(ActualSet.planned_exercise))
+        .where(ActualSet.id == db_actual_set.id)
+    )
+    res = await session.execute(stmt)
+    return res.scalar_one()
 
 async def delete_actual_set_by_id(session: AsyncSession, actual_set_id: int, user_id: int):
     query = (
         select(ActualSet)
         .join(PlannedExercise)
         .join(WorkoutPlan)
+        .options(selectinload(ActualSet.planned_exercise))
         .where(ActualSet.id == actual_set_id, WorkoutPlan.user_id == user_id)
     )
 
@@ -56,12 +72,10 @@ async def delete_actual_set_by_id(session: AsyncSession, actual_set_id: int, use
     db_actual_set = result.scalar_one_or_none()
 
     if not db_actual_set:
-        return False
+        return None
     
     await session.delete(db_actual_set)
     await session.commit()
-    return {
-        "success": True,
-        "message": "Актуальный подход удален"
-    }
+    
+    return db_actual_set
     

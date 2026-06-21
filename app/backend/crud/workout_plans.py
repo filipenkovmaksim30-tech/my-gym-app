@@ -4,8 +4,8 @@ from sqlalchemy.orm import selectinload
 
 from datetime import date
 
-from app.backend.databases.models import WorkoutPlan, PlannedExercise
-from app.backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan
+from backend.databases.models import WorkoutPlan, PlannedExercise
+from backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan
 
 
 async def init_workplan(session: AsyncSession, workoutplan: CreateWorkoutPlan, user_id: int):

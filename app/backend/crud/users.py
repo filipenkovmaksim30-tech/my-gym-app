@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.backend.schemas.user_schemas import UserCreate, UserLogin, ChangePassword
-from app.backend.databases.models import User
-from app.backend.auth.security import get_password_hash, verify_password
+from backend.schemas.user_schemas import UserCreate, UserLogin, ChangePassword
+from backend.databases.models import User
+from backend.auth.security import get_password_hash, verify_password
 from sqlalchemy import select
 
 

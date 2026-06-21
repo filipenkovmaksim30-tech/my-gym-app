@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, status, HTTPException
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.backend.databases.database import get_session
-from app.backend.auth.auth import get_current_user
-from app.backend.crud.actual_sets import init_actual_set, edit_actual_set, delete_actual_set_by_id
-from app.backend.schemas.actual_set_schemas import ActualSetResponse, EditActualSet, CreateActualSet
-from app.backend.schemas.user_schemas import UserResponse
+from backend.databases.database import get_session
+from backend.auth.auth import get_current_user
+from backend.crud.actual_sets import init_actual_set, edit_actual_set, delete_actual_set_by_id
+from backend.schemas.actual_set_schemas import ActualSetResponse, EditActualSet, CreateActualSet
+from backend.schemas.user_schemas import UserResponse
+
+from backend.cache.redis import cache_backend
 
 router = APIRouter(tags=["ActualSet"], prefix="/actual_sets")
 
@@ -24,6 +26,13 @@ async def create_actual_set(
 
     if not new_set:
         raise HTTPException(status_code=404, detail="Не удалось создать актуальный подход")
+    
+    exercise_id = actual_set_data.planned_exercise_id
+
+    await cache_backend.delete_cache(f"planned_exercise:{exercise_id}")
+    await cache_backend.delete_cache(f"workout_plan_exercise:{new_set.planned_exercise.workout_plan_id}")
+    await cache_backend.delete_cache(f"user_plan:{current_user.id}")
+
     return new_set
 
 @router.put("/{actual_set_id}",
@@ -41,6 +50,11 @@ async def update_actual_set(
 
     if not updated:
         raise HTTPException(status_code=404, detail="Актуальный подход не найден или доступ запрещен")
+    
+    await cache_backend.delete_cache(f"planned_exercise:{updated.planned_exercise_id}")
+    await cache_backend.delete_cache(f"workout_plan_exercise:{updated.planned_exercise.workout_plan_id}")
+    await cache_backend.delete_cache(f"user_plan:{current_user.id}")    
+
     return updated
 
 @router.delete("/{actual_set_id}",
@@ -52,9 +66,13 @@ async def delete_actual_set(
     session: AsyncSession = Depends(get_session),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    deleted = await delete_actual_set_by_id(session, actual_set_id, current_user.id)
+    deleted_set = await delete_actual_set_by_id(session, actual_set_id, current_user.id)
 
-    if not deleted:
+    if not deleted_set:
         raise HTTPException(status_code=404, detail="Актуальный подход не найден или доступ запрещен")
     
+    await cache_backend.delete_cache(f"planned_exercise:{deleted_set.planned_exercise_id}")
+    await cache_backend.delete_cache(f"workout_plan_exercise:{deleted_set.planned_exercise.workout_plan_id}")
+    await cache_backend.delete_cache(f"user_plan:{current_user.id}") 
+
     return {"success": True, "message": "Актуальный подход успешно удален"}

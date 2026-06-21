@@ -7,10 +7,12 @@ import jwt
 from jwt.exceptions import PyJWTError as JWTError
 from passlib.context import CryptContext
 
-from app.backend.auth.config import settings
-from app.backend.databases.database import async_session_factory
-from app.backend.crud.users import get_user_by_id
-from app.backend.databases.models import User
+from backend.auth.config import settings
+from backend.databases.database import get_session
+from backend.crud.users import get_user_by_id
+from backend.databases.models import User
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 class OAuth2PasswordBearerWithCookie(OAuth2):
     def __init__(self, tokenUrl:str):
@@ -41,7 +43,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_schema)) -> User:
+async def get_current_user(
+    token: str = Depends(oauth2_schema),
+    session: AsyncSession = Depends(get_session)
+) -> User:
     credential_exceptions = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Не удалось подтвердить учетные данные",
@@ -57,11 +62,11 @@ async def get_current_user(token: str = Depends(oauth2_schema)) -> User:
     except JWTError:
         raise credential_exceptions
 
-    async with async_session_factory() as session:
-        user = await get_user_by_id(session, int(user_id))
+    
+    user = await get_user_by_id(session, int(user_id))
         
-        if user is None:
-            raise credential_exceptions
+    if user is None:
+        raise credential_exceptions
 
-        return user
+    return user
 

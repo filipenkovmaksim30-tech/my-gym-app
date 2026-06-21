@@ -3,11 +3,6 @@ from datetime import datetime
 import re
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: UserResponse
-
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=20)
     password: str = Field(..., min_length=8, max_length=30)
@@ -49,3 +44,8 @@ class ChangePassword(BaseModel):
         if info.data.get('old_password') and v == info.data['old_password']:
             raise ValueError("Новый пароль должен отличаться от старого")
         return v
+    
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
