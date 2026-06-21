@@ -3,6 +3,7 @@ version: '3.8'
 services:
   web:
     build: .
+    container_name: gym_backend
     ports:
       - "8000:8000"
     volumes:
@@ -37,6 +38,18 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - gym_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gym_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - web
     networks:
       - gym_network
 

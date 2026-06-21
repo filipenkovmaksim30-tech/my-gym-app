@@ -22,7 +22,7 @@ export default function Login({ onNavigate }) {
       params.append('password', formData.password);
 
       // Отправляем запрос на бэк с флагом сCredentials, чтобы браузер сохранил куку
-      const response = await axios.post('http://127.0.0.1:8000/auth/login', params, {
+      const response = await axios.post('/api/auth/login', params, {
         headers: { 
           'Content-Type': 'application/x-www-form-urlencoded' 
         },
