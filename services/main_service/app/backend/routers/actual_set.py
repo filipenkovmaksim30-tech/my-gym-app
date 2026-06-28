@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, status, HTTPException
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.main_service.app.backend.databases.database import get_session
-from services.main_service.app.backend.auth.auth import get_current_user
-from services.main_service.app.backend.crud.actual_sets import init_actual_set, edit_actual_set, delete_actual_set_by_id
-from services.main_service.app.backend.schemas.actual_set_schemas import ActualSetResponse, EditActualSet, CreateActualSet
-from services.main_service.app.backend.schemas.user_schemas import UserResponse
+from app.backend.databases.database import get_session
+from app.backend.auth.auth import get_current_user
+from app.backend.crud.actual_sets import init_actual_set, edit_actual_set, delete_actual_set_by_id
+from app.backend.schemas.actual_set_schemas import ActualSetResponse, EditActualSet, CreateActualSet
+from app.backend.schemas.user_schemas import UserResponse
 
-from services.main_service.app.backend.cache.redis import cache_backend
+from app.backend.cache.redis import cache_backend
 
 router = APIRouter(tags=["ActualSet"], prefix="/actual_sets")
 

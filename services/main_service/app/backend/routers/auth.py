@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
-from services.main_service.app.backend.databases.database import get_session
-from services.main_service.app.backend.crud.users import create_user, get_user_by_username, change_user_password
-from services.main_service.app.backend.schemas.user_schemas import UserCreate, UserResponse, ChangePassword
-from services.main_service.app.backend.databases.models import User
-from services.main_service.app.backend.auth.auth import create_access_token, get_current_user
-from services.main_service.app.backend.auth.security import verify_password
+from app.backend.databases.database import get_session
+from app.backend.crud.users import create_user, get_user_by_username, change_user_password
+from app.backend.schemas.user_schemas import UserCreate, UserResponse, ChangePassword
+from app.backend.databases.models import User
+from app.backend.auth.auth import create_access_token, get_current_user
+from app.backend.auth.security import verify_password
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

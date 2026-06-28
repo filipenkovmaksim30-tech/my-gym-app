@@ -16,7 +16,7 @@ async def get_session():
         yield session
 
 async def init_db():
-    from services.main_service.app.backend.databases.models import Base as ModelBase
+    from app.backend.databases.models import Base as ModelBase
 
     async with async_engine.begin() as conn:
         await conn.run_sync(ModelBase.metadata.create_all)

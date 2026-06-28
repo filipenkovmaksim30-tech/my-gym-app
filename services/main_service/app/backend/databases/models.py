@@ -1,7 +1,8 @@
-from services.main_service.app.backend.databases.database import Base
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Date, Float
+from app.backend.databases.database import Base
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Date, Float, Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+import enum
 
 class User(Base):
     __tablename__ = "users"
@@ -59,3 +60,15 @@ class ActualSet(Base):
     reps_done = Column(Integer, nullable=False)
 
     planned_exercise = relationship("PlannedExercise", back_populates="actual_sets")
+
+class ReportStatus(str, enum.Enum):
+    PROCESSING = "processing"
+    SUCCESS = "success"
+    FAILED = "failed"
+
+class Report(Base):
+    __tablename__ = "reports"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Enum(ReportStatus), default=ReportStatus.PROCESSING, nullable=False)    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

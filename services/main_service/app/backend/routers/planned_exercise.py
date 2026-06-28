@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from typing import List
 
-from services.main_service.app.backend.crud.planned_exercises import init_planned_exercises, get_all_planned_exercises_by_workout_plan_id,\
+from app.backend.crud.planned_exercises import init_planned_exercises, get_all_planned_exercises_by_workout_plan_id,\
 get_planned_exercises_by_id, edit_planned_exercises, delete_planned_exercises
-from services.main_service.app.backend.schemas.planned_exercises_schemas import PlannedExercisesResponse, EditPlannedExercises, CreatePlannedExercises
-from services.main_service.app.backend.schemas.user_schemas import UserResponse
-from services.main_service.app.backend.auth.auth import get_current_user
-from services.main_service.app.backend.databases.database import get_session
-from services.main_service.app.backend.cache.redis import cache_backend
+from app.backend.schemas.planned_exercises_schemas import PlannedExercisesResponse, EditPlannedExercises, CreatePlannedExercises
+from app.backend.schemas.user_schemas import UserResponse
+from app.backend.auth.auth import get_current_user
+from app.backend.databases.database import get_session
+from app.backend.cache.redis import cache_backend
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["PlannedExercises"], prefix="/planned_exercises")

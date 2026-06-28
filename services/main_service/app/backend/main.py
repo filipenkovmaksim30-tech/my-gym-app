@@ -6,16 +6,22 @@ import uvicorn
 import traceback
 from contextlib import asynccontextmanager
 
-from services.main_service.app.backend.routers import workout_plan
-from services.main_service.app.backend.databases.database import init_db
-from services.main_service.app.backend.cache.redis import cache_backend
-from services.main_service.app.backend.routers import actual_set, auth, planned_exercise, planned_sets
+from app.backend.routers import workout_plan
+from app.backend.databases.database import init_db
+from app.backend.cache.redis import cache_backend
+from app.backend.routers import actual_set, auth, planned_exercise, planned_sets, \
+internal, reports
+from scheduler import broker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await broker.startup()
     await cache_backend.connect()
+
     yield
+
+    await broker.shutdown()
     await cache_backend.close()
 
 app = FastAPI(
@@ -87,6 +93,8 @@ app.include_router(workout_plan.router)
 app.include_router(planned_exercise.router)
 app.include_router(planned_sets.router)
 app.include_router(actual_set.router)
+app.include_router(internal.router)
+app.include_router(reports.router)
 
 if __name__ == "__main__":
     uvicorn.run(

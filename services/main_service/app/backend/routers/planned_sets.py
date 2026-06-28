@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.main_service.app.backend.crud.planned_sets import init_planned_set, edit_planned_set, delete_planned_set
-from services.main_service.app.backend.schemas.planned_set_schemas import PlannedSetResponse, CreatePlannedSet, EditPlannedSet
-from services.main_service.app.backend.schemas.user_schemas import UserResponse
-from services.main_service.app.backend.auth.auth import get_current_user
-from services.main_service.app.backend.databases.database import get_session
+from app.backend.crud.planned_sets import init_planned_set, edit_planned_set, delete_planned_set
+from app.backend.schemas.planned_set_schemas import PlannedSetResponse, CreatePlannedSet, EditPlannedSet
+from app.backend.schemas.user_schemas import UserResponse
+from app.backend.auth.auth import get_current_user
+from app.backend.databases.database import get_session
 
-from services.main_service.app.backend.cache.redis import cache_backend
+from app.backend.cache.redis import cache_backend
 
 router = APIRouter(tags=["PlannedSets"], prefix="/planned_sets")
 

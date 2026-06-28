@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from typing import List
 
-from services.main_service.app.backend.crud.workout_plans import init_workplan, get_workplan_by_id, update_workplan_by_id , \
+from app.backend.crud.workout_plans import init_workplan, get_workplan_by_id, update_workplan_by_id , \
 delete_workplan_by_id, get_all_workplans_by_user, copy_workout_plan_to_date
-from services.main_service.app.backend.databases.database import get_session
-from services.main_service.app.backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan, CopyWorkoutPlanRequest
-from services.main_service.app.backend.schemas.user_schemas import UserResponse
-from services.main_service.app.backend.auth.auth import get_current_user
+from app.backend.databases.database import get_session
+from app.backend.schemas.workout_plan_schemas import CreateWorkoutPlan, WorkoutPlanResponse, EditWorkoutPlan, CopyWorkoutPlanRequest
+from app.backend.schemas.user_schemas import UserResponse
+from app.backend.auth.auth import get_current_user
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from services.main_service.app.backend.cache.redis import cache_backend
+from app.backend.cache.redis import cache_backend
 
 
 router = APIRouter(tags=["Workoutplan"], prefix="/workoutplan")

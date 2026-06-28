@@ -2,8 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from services.main_service.app.backend.databases.models import PlannedExercise, WorkoutPlan
-from services.main_service.app.backend.schemas.planned_exercises_schemas import CreatePlannedExercises, EditPlannedExercises
+from app.backend.databases.models import PlannedExercise, WorkoutPlan
+from app.backend.schemas.planned_exercises_schemas import CreatePlannedExercises, EditPlannedExercises
 
 async def init_planned_exercises(session: AsyncSession, planned_exercises: CreatePlannedExercises):
     planned_exercises_data = planned_exercises.model_dump()

@@ -1,7 +1,7 @@
 import json
 from typing import Optional, Any
 import redis.asyncio as aioredis
-from services.main_service.app.backend.auth.config import settings
+from app.backend.auth.config import settings
 
 
 class RedisCacheBackend:

@@ -1,11 +1,13 @@
 import os
+import json
 import httpx
 import matplotlib.pyplot as plt
 from reportlab.pdfgen import canvas
+from aio_pika import Message
 from app.scheduler import broker
 
-@broker.register_task(name="generate_user_report")
-async def generate_user_report(user_id: int):
+@broker.task(name="generate_user_report")
+async def generate_user_report(user_id: int, email: str):
     print(f"[Reports] Начинаем генерацию отчета для пользователя: {user_id}")
 
     MAIN_SERVICE_URL = os.getenv("MAIN_SERVICE_URL", "http://gym_backend:8000")
@@ -18,7 +20,7 @@ async def generate_user_report(user_id: int):
                 return
             data = response.json()
     except Exception as e:
-        print(f"[Reports] Не удалось получить данные от главного сервиса: {e}")
+        print(f"[Reports] Не удалось получить данные от главногоサービスの: {e}")
         return
 
     plt.figure(figsize=(6, 4))
@@ -32,6 +34,7 @@ async def generate_user_report(user_id: int):
     plt.savefig(chart_path, bbox_inches='tight')
     plt.close()
 
+    # Генерируем PDF
     pdf_path = f"/tmp/report_{user_id}.pdf"
     c = canvas.Canvas(pdf_path)
     c.setFont("Helvetica-Bold", 18)
@@ -47,5 +50,20 @@ async def generate_user_report(user_id: int):
     
     if os.path.exists(chart_path):
         os.remove(chart_path)
-        
-    # TODO: Сюда мы добавим отправку сообщения в RabbitMQ для сервиса уведомлений
+
+    try:
+        if broker.is_connected:
+            channel = broker.connection.channel()
+            
+            notification_payload = {
+                "email": email,       
+                "file_path": pdf_path
+            }
+            
+            await channel.default_exchange.publish(
+                Message(body=json.dumps(notification_payload).encode()),
+                routing_key="notifications_queue"
+            )
+            print(f"[Reports] Задача на отправку письма для {email} успешно перенаправлена в очередь!")
+    except Exception as e:
+        print(f"[Reports] Не удалось отправить задачу в notification_service: {e}")

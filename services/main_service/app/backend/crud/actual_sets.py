@@ -2,8 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from services.main_service.app.backend.databases.models import ActualSet, WorkoutPlan, PlannedExercise
-from services.main_service.app.backend.schemas.actual_set_schemas import CreateActualSet, EditActualSet
+from app.backend.databases.models import ActualSet, WorkoutPlan, PlannedExercise
+from app.backend.schemas.actual_set_schemas import CreateActualSet, EditActualSet
 
 async def init_actual_set(session: AsyncSession, actual_data: CreateActualSet, user_id: int):
     query = (

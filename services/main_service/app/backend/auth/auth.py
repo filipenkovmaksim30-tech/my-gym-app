@@ -7,10 +7,10 @@ import jwt
 from jwt.exceptions import PyJWTError as JWTError
 from passlib.context import CryptContext
 
-from services.main_service.app.backend.auth.config import settings
-from services.main_service.app.backend.databases.database import get_session
-from services.main_service.app.backend.crud.users import get_user_by_id
-from services.main_service.app.backend.databases.models import User
+from app.backend.auth.config import settings
+from app.backend.databases.database import get_session
+from app.backend.crud.users import get_user_by_id
+from app.backend.databases.models import User
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
